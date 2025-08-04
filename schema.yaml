@@ -1,0 +1,40 @@
+# Schema definition for Oracle Tables Knowledge Graph
+node_types:
+  - TABLE    # Database tables and views
+  - COLUMN   # Table columns
+  - VIEW     # Database views
+
+# Relationship types between nodes
+relationship_types:
+  - REFERENCES    # Foreign key relationships between tables
+  - HAS_COLUMN    # Relationship from table to its columns
+  - USES_TABLE    # Relationship from view to its underlying tables
+
+# Define required properties for specific node types
+properties:
+  nodes:
+    TABLE:
+      - id             # Table ID (usually lowercase name)
+      - name           # Table name
+      - module         # Module name (e.g., Financials, HCM)
+      - submodule      # Submodule name
+      - description    # Table description
+      - embedding      # Vector embedding
+    COLUMN:
+      - id             # Column ID (format: tablename_columnname)
+      - name           # Column name
+      - datatype       # Data type
+      - table_id       # ID of the parent table
+      - description    # Column description/comments
+      - is_primary_key # Whether column is part of primary key
+      - is_foreign_key # Whether column is a foreign key
+      - embedding      # Vector embedding
+    VIEW:
+      - id             # View ID (usually lowercase name)
+      - name           # View name
+      - module         # Module name
+      - submodule      # Submodule name
+      - description    # View description
+      - sql_query      # SQL query definition
+      - tables_used    # List of tables used by the view
+      - embedding      # Vector embedding

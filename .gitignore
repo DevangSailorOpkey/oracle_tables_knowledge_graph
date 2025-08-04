@@ -1,0 +1,47 @@
+# Environment and configuration files
+.env
+.DS_Store
+
+# Data files
+Tables/
+*.zip
+*.json
+
+# Python cache and compiled files
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Neo4j data and logs
+neo4j_data/
+neo4j_logs/
+neo4j_plugins/
+neo4j_import/
+
+# Additional Python ignores
+*.so
+.coverage
+.pytest_cache/
+.tox/
+.venv/
+venv/
+ENV/
+env/
+.env.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
