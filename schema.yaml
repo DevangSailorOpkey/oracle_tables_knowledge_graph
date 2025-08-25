@@ -1,40 +1,104 @@
 # Schema definition for Oracle Tables Knowledge Graph
+
 node_types:
-  - TABLE    # Database tables and views
-  - COLUMN   # Table columns
-  - VIEW     # Database views
+  - TABLE      # Database tables
+  - COLUMN     # Table columns
+  - VIEW       # Database views
 
 # Relationship types between nodes
 relationship_types:
-  - REFERENCES    # Foreign key relationships between tables
-  - HAS_COLUMN    # Relationship from table to its columns
-  - USES_TABLE    # Relationship from view to its underlying tables
+  - REFERENCES         # Foreign key relationships between tables
+  - HAS_COLUMN        # Relationship from table to its columns
+  - USES_TABLE        # Relationship from view to its underlying tables
+  - REFERENCES_COLUMN # Relationship from view to columns it references
 
 # Define required properties for specific node types
 properties:
   nodes:
     TABLE:
-      - id             # Table ID (usually lowercase name)
-      - name           # Table name
-      - module         # Module name (e.g., Financials, HCM)
-      - submodule      # Submodule name
-      - description    # Table description
-      - embedding      # Vector embedding
+      - id          # Table ID (usually lowercase name)
+      - name        # Table name
+      - module      # Module name (e.g., Financials, HCM)
+      - submodule   # Submodule name
+      - description # Table description
+      - embedding   # Vector embedding
+      - details     # Additional table details (schema, owner, etc.)
+      - primary_key # Primary key information
+      - columns     # Column definitions
+      - indexes     # Index definitions
+      
     COLUMN:
-      - id             # Column ID (format: tablename_columnname)
-      - name           # Column name
-      - datatype       # Data type
-      - table_id       # ID of the parent table
-      - description    # Column description/comments
-      - is_primary_key # Whether column is part of primary key
-      - is_foreign_key # Whether column is a foreign key
-      - embedding      # Vector embedding
+      - id               # Column ID (format: tablename_columnname)
+      - name             # Column name
+      - datatype         # Data type
+      - table_id         # ID of the parent table
+      - description      # Column description/comments
+      - is_primary_key   # Whether column is part of primary key
+      - is_foreign_key   # Whether column is a foreign key
+      - references_column # ID of column this references (if foreign key)
+      - length           # Column length
+      - precision        # Column precision
+      - is_nullable      # Whether column allows NULL values
+      - embedding        # Vector embedding
+      
     VIEW:
-      - id             # View ID (usually lowercase name)
-      - name           # View name
-      - module         # Module name
-      - submodule      # Submodule name
-      - description    # View description
-      - sql_query      # SQL query definition
-      - tables_used    # List of tables used by the view
-      - embedding      # Vector embedding
+      - id          # View ID (usually lowercase name)
+      - name        # View name
+      - module      # Module name
+      - submodule   # Submodule name
+      - description # View description
+      - sql_query   # SQL query definition
+      - tables_used # List of tables used by the view
+      - embedding   # Vector embedding
+
+  relationships:
+    REFERENCES:
+      - foreign_key_column # Column that acts as foreign key
+      
+    HAS_COLUMN:
+      # No additional properties needed
+      
+    USES_TABLE:
+      # No additional properties needed
+      
+    REFERENCES_COLUMN:
+      # No additional properties needed
+
+# Graph patterns
+patterns:
+  # Tables have columns
+  - (TABLE)-[:HAS_COLUMN]->(COLUMN)
+  
+  # Tables reference other tables through foreign keys
+  - (TABLE)-[:REFERENCES]->(TABLE)
+  
+  # Columns can reference other columns (foreign key relationships)
+  - (COLUMN)-[:REFERENCES]->(COLUMN)
+  
+  # Views use tables
+  - (VIEW)-[:USES_TABLE]->(TABLE)
+  
+  # Views reference columns from tables
+  - (VIEW)-[:REFERENCES_COLUMN]->(COLUMN)
+
+# Example queries
+example_queries:
+  # Find all columns referenced by a view
+  - |
+    MATCH (v:VIEW {name: 'AR_AGING_BUCKET_LINES_VL'})-[:REFERENCES_COLUMN]->(c:COLUMN)
+    RETURN c.name, c.table_id
+    
+  # Find all views that reference a specific column
+  - |
+    MATCH (v:VIEW)-[:REFERENCES_COLUMN]->(c:COLUMN {name: 'CUSTOMER_ID'})
+    RETURN v.name, v.module
+    
+  # Find views and their column dependencies
+  - |
+    MATCH (v:VIEW)-[:REFERENCES_COLUMN]->(c:COLUMN)<-[:HAS_COLUMN]-(t:TABLE)
+    RETURN v.name AS view, t.name AS table, collect(c.name) AS columns
+    
+  # Find impact of changing a column (which views would be affected)
+  - |
+    MATCH (c:COLUMN {id: 'ar_payment_schedules_customer_id'})<-[:REFERENCES_COLUMN]-(v:VIEW)
+    RETURN v.name AS affected_view, v.description

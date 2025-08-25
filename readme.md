@@ -14,12 +14,14 @@ This project creates a knowledge graph of Oracle tables with vector embeddings t
 - **SQL Generation**: Get suggested SQL queries based on your search intent
 - **Hybrid Search**: Query both tables and columns simultaneously
 - **Console Interface**: Easy-to-use CLI for all operations
+- **Column Metadata Updates**: Update column descriptions and automatically regenerate embeddings
+- **View Management**: Load and search database views with their table relationships
 
 ## Architecture
 
 The system is built around these core components:
 
-- **Knowledge Graph**: Neo4j database storing table and column nodes with relationships
+- **Knowledge Graph**: Neo4j database storing table, column, and view nodes with relationships
 - **Vector Embeddings**: Table and column metadata embedded using Ollama's nomic-embed-text model
 - **Graph Builder**: Creates and maintains the knowledge graph structure
 - **RAG Engine**: Handles queries and retrieval from the knowledge graph
@@ -98,6 +100,20 @@ Search for both tables and columns matching your query:
 
 ```bash
 python cli.py query "customer data" --node-type both
+```
+
+### Update a column's description
+
+Update a column's description and automatically regenerate its embedding:
+
+```bash
+python cli.py column update payment_amounts_total_amount --description "Total payment amount including taxes and fees in transaction currency"
+```
+
+### Verify the update
+
+```bash
+python cli.py column details payment_amounts_total_amount
 ```
 
 ## Example Workflows

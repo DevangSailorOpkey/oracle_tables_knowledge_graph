@@ -90,6 +90,7 @@ class TableNode(BaseModel):
     columns: Optional[List[Column]] = None  # Column definitions
     indexes: Optional[List[Index]] = None  # Index information
     embedding: Optional[List[float]] = None  # Vector embedding
+    tablespace: Optional[str] = None  # ADD THIS LINE
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     

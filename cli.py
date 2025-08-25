@@ -129,7 +129,7 @@ class OracleTablesCLI:
         column_search_parser.add_argument(
             '--top-k',
             type=int,
-            default=100,
+            default=10,
             help='Number of top results to return (default: 5)'
         )
         column_search_parser.add_argument(
@@ -231,6 +231,24 @@ class OracleTablesCLI:
             nargs='+',
             required=True,
             help='List of tables used by the view'
+        )
+
+        # Column update command
+        column_update_parser = column_subparsers.add_parser('update', help='Update column description and regenerate embedding')
+        column_update_parser.add_argument(
+            'column_id',
+            help='ID of the column to update'
+        )
+        column_update_parser.add_argument(
+            '--description',
+            required=True,
+            help='New description for the column'
+        )
+        column_update_parser.add_argument(
+            '--format',
+            choices=['text', 'json'],
+            default='text',
+            help='Output format (default: text)'
         )
 
         # Info command
@@ -453,6 +471,7 @@ class OracleTablesCLI:
                         pk_marker = "🔑 " if column['is_primary_key'] else "  "
                         fk_marker = "🔗 " if column['is_foreign_key'] else "  "
                         print(f"{i+1}. {pk_marker}{fk_marker}{column['name']} ({column['datatype']})")
+                        print(f"   ID: {column['id']}")  # ADD THIS LINE
                         if column['description']:
                             print(f"   Description: {column['description']}")
                         if column['is_foreign_key'] and column['references_column']:
@@ -491,6 +510,39 @@ class OracleTablesCLI:
                 else:
                     print(f"Column with ID '{args.column_id}' not found.")
     
+        elif args.column_command == 'update':
+            # Update column description
+            success = builder.update_column_node(
+                column_id=args.column_id,
+                description=args.description
+            )
+            
+            # Output result
+            if args.format == 'json':
+                result = {
+                    'column_id': args.column_id,
+                    'success': success,
+                    'description': args.description if success else None,
+                    'message': 'Column updated successfully' if success else 'Failed to update column'
+                }
+                print(json.dumps(result, indent=2))
+            else:
+                if success:
+                    print(f"\n✅ Successfully updated column '{args.column_id}'")
+                    print(f"New description: {args.description}")
+                    print("\nThe embedding has been regenerated to reflect the new description.")
+                    
+                    # Optionally show the updated column details
+                    column_details = builder.get_column_details(args.column_id)
+                    if column_details:
+                        print(f"\nColumn details:")
+                        print(f"  Name: {column_details['name']}")
+                        print(f"  Table: {column_details['table_id']}")
+                        print(f"  Type: {column_details['datatype']}")
+                else:
+                    print(f"\n❌ Failed to update column '{args.column_id}'")
+                    print("Please check that the column ID exists and try again.")
+            
     def _handle_view(self, args, builder: TableGraphBuilder):
         """Handle the 'view' command and its subcommands"""
         if not hasattr(args, 'view_command') or not args.view_command:

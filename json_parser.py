@@ -119,6 +119,8 @@ class OracleTableParser:
             object_type=data.get('details', {}).get('object_type', 'TABLE'),
             tablespace=data.get('details', {}).get('tablespace')
         )
+
+        tablespace = data.get('details', {}).get('tablespace', 'Default')
         
         # Extract primary key
         primary_key = None
@@ -201,6 +203,7 @@ class OracleTableParser:
             module=module_name,
             submodule=submodule_name,
             description=description,
+            tablespace=tablespace,  # ADD THIS LINE
             details=details,
             primary_key=primary_key,
             columns=columns,

@@ -691,6 +691,140 @@ class TableGraphBuilder:
             logger.error(traceback.format_exc())
             return None
     
+    def vector_search_columns_in_tables(self, query_text: str, table_ids: List[str], limit: int = 1) -> List[Dict[str, Any]]:
+        """Search for columns by vector similarity within specific tables
+        
+        Args:
+            query_text: Query text (column name to search for)
+            table_ids: List of table IDs to search within
+            limit: Maximum number of results
+            
+        Returns:
+            List of matching columns with similarity scores, sorted by similarity
+        """
+        try:
+            # Get embedding for query
+            query_embedding = self.embedder.get_embedding(query_text)
+            if not query_embedding:
+                logger.error("Failed to generate embedding for query")
+                return []
+            
+            with self.driver.session() as session:
+                # Simple Cypher query with WHERE clause to filter by table_id
+                cypher = """
+                MATCH (c:COLUMN)
+                WHERE c.table_id IN $table_ids AND c.embedding IS NOT NULL
+                WITH c, gds.similarity.cosine(c.embedding, $embedding) AS similarity
+                WHERE similarity > 0.5
+                RETURN 
+                    c.id AS id,
+                    c.name AS name,
+                    c.datatype AS datatype,
+                    c.description AS description,
+                    c.table_id AS table_id,
+                    similarity
+                ORDER BY similarity DESC
+                LIMIT $limit
+                """
+                
+                result = session.run(
+                    cypher,
+                    embedding=query_embedding,
+                    table_ids=[t.lower() for t in table_ids],
+                    limit=limit
+                )
+                
+                matches = []
+                for record in result:
+                    matches.append({
+                        'id': record['id'],
+                        'name': record['name'],
+                        'datatype': record['datatype'],
+                        'description': record['description'],
+                        'table_id': record['table_id'],
+                        'similarity': record['similarity']
+                    })
+                
+                return matches
+                
+        except Exception as e:
+            logger.error(f"Error in vector_search_columns_in_tables: {str(e)}")
+            logger.error(traceback.format_exc())
+            return []
+
+    def update_column_node(self, column_id: str, description: str) -> bool:
+        """Update a column's description and regenerate its embedding
+        
+        Args:
+            column_id: ID of the column to update
+            description: New description for the column
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # First, fetch the existing column to get its properties
+            with self.driver.session() as session:
+                fetch_cypher = """
+                MATCH (c:COLUMN {id: $column_id})
+                RETURN c.name AS name, c.datatype AS datatype, c.table_id AS table_id,
+                    c.is_primary_key AS is_primary_key, c.is_foreign_key AS is_foreign_key,
+                    c.references_column AS references_column
+                """
+                
+                result = session.run(fetch_cypher, column_id=column_id)
+                record = result.single()
+                
+                if not record:
+                    logger.error(f"Column with ID '{column_id}' not found")
+                    return False
+                
+                # Generate new embedding using the column embedder
+                embedding = self.embedder.embed_column(
+                    column_name=record['name'],
+                    datatype=record['datatype'],
+                    table_name=record['table_id'],
+                    description=description,  # Use the new description
+                    is_primary_key=record['is_primary_key'],
+                    is_foreign_key=record['is_foreign_key'],
+                    references_column=record['references_column'] or ""
+                )
+                
+                if not embedding:
+                    logger.error(f"Failed to generate embedding for column {column_id}")
+                    return False
+                
+                # Update the column node with new description and embedding
+                update_cypher = """
+                MATCH (c:COLUMN {id: $column_id})
+                SET c.description = $description,
+                    c.embedding = $embedding,
+                    c.updated_at = datetime($updated_at)
+                RETURN c
+                """
+                
+                result = session.run(
+                    update_cypher,
+                    column_id=column_id,
+                    description=description,
+                    embedding=embedding,
+                    updated_at=datetime.utcnow().isoformat()
+                )
+                
+                # Check if update was successful
+                updated_record = result.single()
+                if updated_record:
+                    logger.info(f"Successfully updated column {column_id} with new description and embedding")
+                    return True
+                else:
+                    logger.error(f"Failed to update column {column_id}")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"Error updating column {column_id}: {str(e)}")
+            logger.error(traceback.format_exc())
+            return False
+
     def find_related_tables(self, table_id: str, depth: int = 1) -> List[Dict[str, Any]]:
         """Find tables related to the given table through relationships
         
@@ -776,6 +910,7 @@ class TableGraphBuilder:
                     t.module AS module,
                     t.submodule AS submodule,
                     t.description AS description,
+                    t.tablespace AS tablespace,
                     t.columns AS columns,
                     t.primary_key AS primary_key,
                     t.indexes AS indexes,
